@@ -69,7 +69,7 @@ async function checkRateLimit(
 
   if (countBeforeThisRequest >= RATE_LIMIT_REQUESTS) {
     // Remove the member we just added since we are rejecting this request.
-    await redis.zrem(key, requestId);
+    await redis.zrem(key, requestId).catch(() => {});
     return { allowed: false, retryAfterSec: RATE_LIMIT_WINDOW_SEC };
   }
 
@@ -106,24 +106,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { userId, eventId } = parsed.data;
 
   // 2. Enforce per-user rate limiting.
-  const { allowed, retryAfterSec } = await checkRateLimit(userId);
-  if (!allowed) {
-    // Fire-and-forget: metric must never block the response
-    void trackRequestEvent("REJECTED");
-    return NextResponse.json(
-      {
-        error: "Too many registration attempts. Please slow down.",
-        retryAfterSec,
-      },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(retryAfterSec),
-          "X-RateLimit-Limit": String(RATE_LIMIT_REQUESTS),
-          "X-RateLimit-Window": `${RATE_LIMIT_WINDOW_SEC}s`,
+  // Fails OPEN: if Redis is unavailable we log and allow the request through
+  // rather than blocking all registrations. Inngest provides a second layer
+  // of duplicate-detection via the DB unique constraint.
+  try {
+    const { allowed, retryAfterSec } = await checkRateLimit(userId);
+    if (!allowed) {
+      void trackRequestEvent("REJECTED");
+      return NextResponse.json(
+        {
+          error: "Too many registration attempts. Please slow down.",
+          retryAfterSec,
         },
-      }
-    );
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSec),
+            "X-RateLimit-Limit": String(RATE_LIMIT_REQUESTS),
+            "X-RateLimit-Window": `${RATE_LIMIT_WINDOW_SEC}s`,
+          },
+        }
+      );
+    }
+  } catch (redisErr) {
+    // Redis degraded — log and continue. The DB unique constraint prevents
+    // duplicate registrations even without the rate limiter.
+    console.warn("[registrations] Rate limiter unavailable, failing open:", redisErr);
   }
 
   // 3. Emit the Inngest event -- non-blocking, returns as soon as the

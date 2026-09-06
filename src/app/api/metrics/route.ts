@@ -49,7 +49,10 @@ export async function GET(): Promise<NextResponse> {
       waitlistedCount,
       seatAggregates,
     ] = await Promise.all([
-      redisPipeline.exec(),
+      redisPipeline.exec().catch((err) => {
+        console.warn("[metrics] Redis unavailable, fallback to zeros:", err);
+        return [];
+      }),
       prisma.registration.count({ where: { status: RegistrationStatus.CONFIRMED } }),
       prisma.registration.count({ where: { status: RegistrationStatus.WAITLISTED } }),
       prisma.event.aggregate({

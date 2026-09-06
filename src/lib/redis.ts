@@ -12,11 +12,21 @@ const globalForRedis = globalThis as unknown as {
   redis: Redis | undefined;
 };
 
+// Auto-sanitize token to prevent bad copy-pastes (e.g. quotes, whitespace, or trailing "IN" artifact)
+function getRedisToken(): string {
+  const raw = process.env.UPSTASH_REDIS_REST_TOKEN || "";
+  let token = raw.trim().replace(/^["']|["']$/g, "");
+  if (token.endsWith("ZQIN")) {
+    token = token.slice(0, -2);
+  }
+  return token;
+}
+
 export const redis =
   globalForRedis.redis ??
   new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: (process.env.UPSTASH_REDIS_REST_URL || "").trim().replace(/^["']|["']$/g, ""),
+    token: getRedisToken(),
   });
 
 if (process.env.NODE_ENV !== "production") {
