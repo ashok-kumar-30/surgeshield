@@ -44,11 +44,10 @@ export const processRegistration = inngest.createFunction(
     id: "process-registration",
     name: "Process Event Registration",
 
-    // Concurrency: at most 10 workers per eventId run simultaneously.
-    // This protects the Postgres connection pool during traffic surges while
-    // still allowing parallel processing across different events.
+    // Concurrency: at most 5 workers per eventId run simultaneously.
+    // (Inngest free plan limit; upgrade to increase.)
     concurrency: {
-      limit: 10,
+      limit: 5,
       key: "event.data.eventId",
     },
 
