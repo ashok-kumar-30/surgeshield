@@ -11,7 +11,12 @@
 
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY ?? "");
+/** Lazily instantiate Resend so the build never fails if the key is absent. */
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY is not set");
+  return new Resend(key);
+}
 const FROM   = process.env.FROM_EMAIL ?? "SurgeShield <noreply@surgeshield.dev>";
 
 // ─── Shared styles ───────────────────────────────────────────────────────────
@@ -63,6 +68,8 @@ export async function sendConfirmedEmail(params: {
     console.info(`[email] Would send CONFIRMED email: event="${eventTitle}", reg=${registrationId}`);
     return;
   }
+
+  const resend = getResend();
 
   const locationLine = isVirtual
     ? (meetingUrl ? `<a href="${meetingUrl}" style="color:#a5b4fc;">${meetingUrl}</a>` : "Virtual Event")
@@ -149,6 +156,8 @@ export async function sendWaitlistedEmail(params: {
     console.info(`[email] Would send WAITLISTED email: event="${eventTitle}"`);
     return;
   }
+
+  const resend = getResend();
 
   const html = `
 <!DOCTYPE html>
