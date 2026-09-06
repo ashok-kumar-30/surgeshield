@@ -16,35 +16,24 @@ import { Prisma, RegistrationStatus } from "@prisma/client";
 import { inngest } from "@/inngest/client";
 import { prisma } from "@/lib/prisma";
 import { trackRequestEvent } from "@/lib/metrics";
+import { sendConfirmedEmail, sendWaitlistedEmail } from "@/lib/email";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type SeatClaimResult =
-  | { outcome: "CONFIRMED"; eventTitle: string }
-  | { outcome: "WAITLISTED" };
+  | {
+      outcome: "CONFIRMED";
+      eventTitle: string;
+      eventDate: string | null;
+      location:  string | null;
+      meetingUrl: string | null;
+      isVirtual:  boolean;
+    }
+  | { outcome: "WAITLISTED"; eventTitle: string };
 
-// ---------------------------------------------------------------------------
-// Simulated notification service (replace with Resend / SendGrid / etc.)
-// ---------------------------------------------------------------------------
-
-async function sendConfirmationEmail(params: {
-  userId: string;
-  eventId: string;
-  eventTitle: string;
-  registrationId: string;
-}): Promise<void> {
-  // Simulate an occasional third-party outage so Inngest retries are visible.
-  if (Math.random() < 0.1) {
-    throw new Error("Notification service timeout -- will be retried by Inngest.");
-  }
-  // Replace this with your real email/calendar SDK call.
-  console.info(
-    `[notifications] Confirmation sent to user=${params.userId} ` +
-    `for event="${params.eventTitle}" (reg=${params.registrationId})`
-  );
-}
+type UserInfo = { email: string; name: string | null; };
 
 // ---------------------------------------------------------------------------
 // Inngest function
@@ -86,6 +75,21 @@ export const processRegistration = inngest.createFunction(
     // subsequent cold start never re-runs this step.
     // -----------------------------------------------------------------------
 
+    // Fetch user info (email + name) for notification — cached in this step.
+    const userInfo = await step.run(
+      "fetch-user-info",
+      async (): Promise<UserInfo> => {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true, name: true },
+        });
+        if (!user?.email) {
+          throw new NonRetriableError(`User ${userId} not found or has no email.`);
+        }
+        return { email: user.email, name: user.name ?? "there" };
+      }
+    );
+
     const claimResult = await step.run(
       "claim-seat",
       async (): Promise<SeatClaimResult> => {
@@ -101,29 +105,34 @@ export const processRegistration = inngest.createFunction(
           });
 
           if (updated.count === 0) {
-            // No seats available; fetch the event title for logging.
             const event = await tx.event.findUnique({
               where: { id: eventId },
               select: { title: true, isPublished: true },
             });
-
             if (!event) {
-              // The event does not exist -- nothing we can do; stop retrying.
-              throw new NonRetriableError(
-                `Event ${eventId} not found or unpublished.`
-              );
+              throw new NonRetriableError(`Event ${eventId} not found or unpublished.`);
             }
-
-            return { outcome: "WAITLISTED" };
+            return { outcome: "WAITLISTED", eventTitle: event.title };
           }
 
-          // Fetch the title for the confirmation email.
           const updatedEvent = await tx.event.findUniqueOrThrow({
             where: { id: eventId },
-            select: { title: true },
+            select: {
+              title: true, startsAt: true, location: true,
+              meetingUrl: true, isVirtual: true,
+            },
           });
 
-          return { outcome: "CONFIRMED", eventTitle: updatedEvent.title };
+          return {
+            outcome:    "CONFIRMED",
+            eventTitle: updatedEvent.title,
+            eventDate:  updatedEvent.startsAt.toLocaleDateString("en-US", {
+              weekday: "long", month: "long", day: "numeric", year: "numeric",
+            }),
+            location:   updatedEvent.location,
+            meetingUrl: updatedEvent.meetingUrl,
+            isVirtual:  updatedEvent.isVirtual,
+          };
         });
       }
     );
@@ -179,30 +188,42 @@ export const processRegistration = inngest.createFunction(
       }
     );
 
-    // If the user was waitlisted, emit an event for any downstream
-    // waitlist-management function and exit early.
+    // If the user was waitlisted, send waitlist email and exit early.
     if (claimResult.outcome === "WAITLISTED") {
+      await step.run("send-waitlist-email", async () => {
+        await sendWaitlistedEmail({
+          to:         userInfo.email,
+          name:       userInfo.name ?? "there",
+          eventTitle: claimResult.eventTitle,
+        });
+      });
+
       await inngest.send({
         name: "event/registration.waitlisted",
         data: { userId, eventId },
       });
 
-      logger.info("User waitlisted -- no seat available.", { userId, eventId });
+      logger.info("User waitlisted — waitlist email dispatched.", { userId, eventId });
       return { status: "WAITLISTED", registrationId: registration.id };
     }
 
     // -----------------------------------------------------------------------
-    // Step 3 -- Send confirmation notification
+    // Step 3 -- Send confirmation email via Resend
     //
-    // Isolated in its own step so that a flaky email provider does NOT
-    // cause a seat to be re-decremented on retry -- only this step re-runs.
+    // Isolated in its own step so that a Resend outage does NOT
+    // cause a seat to be re-decremented on retry — only this step re-runs.
     // -----------------------------------------------------------------------
 
     await step.run("send-confirmation-email", async () => {
-      await sendConfirmationEmail({
-        userId,
-        eventId,
-        eventTitle: (claimResult as { outcome: "CONFIRMED"; eventTitle: string }).eventTitle,
+      const confirmed = claimResult as Extract<SeatClaimResult, { outcome: "CONFIRMED" }>;
+      await sendConfirmedEmail({
+        to:             userInfo.email,
+        name:           userInfo.name ?? "there",
+        eventTitle:     confirmed.eventTitle,
+        eventDate:      confirmed.eventDate ?? undefined,
+        location:       confirmed.location  ?? undefined,
+        meetingUrl:     confirmed.meetingUrl ?? undefined,
+        isVirtual:      confirmed.isVirtual,
         registrationId: registration.id,
       });
     });
