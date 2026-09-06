@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "push": "git add . && git commit -m \"$npm_config_m\" && git push origin main"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
