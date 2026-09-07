@@ -5,7 +5,7 @@
 // BEFORE RUNNING:
 //   1. npm run dev           (in terminal 1)
 //   2. npx inngest-cli dev   (in terminal 2, optional but shows jobs processing)
-//   3. Open http://localhost:3000/admin/dashboard  (watch the sparklines live)
+//   3. Open https://surgeshield-xi.vercel.app/admin/dashboard  (watch the sparklines live)
 //   4. node scripts/load-test.mjs [preset]
 //
 // PRESETS:
@@ -98,7 +98,7 @@ async function main() {
   console.log("  ⊘ = 429 Rate Limited (user sent too many)");
   console.log("  ✗ = Error");
   console.log("───────────────────────────────────────────────────────────");
-  console.log("  👉 Watch: http://localhost:3000/admin/dashboard");
+  console.log("  👉 Watch: https://surgeshield-xi.vercel.app/admin/dashboard");
   console.log("═══════════════════════════════════════════════════════════");
 
   const startTime = Date.now();
