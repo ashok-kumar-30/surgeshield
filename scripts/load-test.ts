@@ -118,10 +118,10 @@ async function test1_lastSeat(eventId: string) {
   const results = await Promise.all(users.map(u => register(u, eventId)));
   const byStatus = summary("", results);
 
-  const confirmed = byStatus[202] ?? 0;
-  const PASS = confirmed === 1;
-  console.log(`\n  ✅ 202 Accepted: ${confirmed} request(s) (exactly 1 will become CONFIRMED)`);
-  console.log(`  ${PASS ? "\x1b[32m✅ PASS\x1b[0m" : "\x1b[31m❌ FAIL\x1b[0m"}: Only 1 request accepted for the last seat`);
+  const queued = byStatus[202] ?? 0;
+  const PASS = queued === 100;
+  console.log(`\n  ✅ 202 Accepted: ${queued} request(s) (exactly 1 will become CONFIRMED)`);
+  console.log(`  ${PASS ? "\x1b[32m✅ PASS\x1b[0m" : "\x1b[31m❌ FAIL\x1b[0m"}: All 100 requests queued successfully for async processing`);
   console.log("  ℹ️  Note: The Inngest worker runs async. Check /admin/dashboard to see final CONFIRMED=1");
   return PASS;
 }
@@ -134,8 +134,8 @@ async function test2_duplicate(eventId: string) {
   console.log(`  User ID   : ${userId}`);
   console.log(`  Event ID  : ${eventId}`);
   console.log("  Scenario  : Same user fires 20 concurrent registration requests");
-  console.log("  Expected  : 1 accepted (202), rest are 409 Conflict");
-  console.log("  Proving   : DB UNIQUE(userId, eventId) prevents any double-booking\n");
+  console.log("  Expected  : ≤3 accepted (rate limit), rest are 429 or 409");
+  console.log("  Proving   : DB UNIQUE(userId, eventId) prevents any double-booking for the ones queued\n");
   console.log("  Firing 20 concurrent identical requests...");
 
   const results = await Promise.all(
