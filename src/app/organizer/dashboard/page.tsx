@@ -38,7 +38,7 @@ export default function OrganizerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/admin/stats')
+    fetch('/api/organizer/stats')
       .then(r => {
         if (r.status === 403) throw new Error('403');
         if (!r.ok) throw new Error(`${r.status}`);

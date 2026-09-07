@@ -130,7 +130,7 @@ export default async function HomePage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {CATEGORIES.map(c => (
-            <Link key={c.label} href={`/events?category=${c.label.toLowerCase()}`}
+            <Link key={c.label} href={`/events?q=${encodeURIComponent(c.label.toLowerCase())}`}
               className="group glass rounded-2xl p-5 hover:-translate-y-1 transition-all duration-200 cursor-pointer relative overflow-hidden">
               <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-2xl" style={{ background: c.color }} />
               <div className="text-3xl mb-3">{c.icon}</div>
