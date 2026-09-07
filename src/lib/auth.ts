@@ -19,6 +19,10 @@ import { UserRole } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
+  // ── Required for Vercel / reverse-proxy deployments in NextAuth v5 ─────
+  // Without this, OAuth host-verification fails for Google while
+  // Credentials (which skips redirect-URL verification) still works.
+  trustHost: true,
   session: { strategy: "jwt" },
 
   providers: [
@@ -58,18 +62,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // ── OAuth: persist user to our DB on first sign-in ────────────────────
     async signIn({ user, account }) {
       if (account?.type === "oauth" && user.email) {
-        const existing = await prisma.user.findUnique({
-          where: { email: user.email },
-        });
-
-        if (!existing) {
-          const created = await prisma.user.create({
-            data: { email: user.email, name: user.name, image: user.image },
+        try {
+          const existing = await prisma.user.findUnique({
+            where: { email: user.email },
           });
-          user.id = created.id;
-        } else {
-          user.id   = existing.id;
-          (user as any).role = existing.role;
+
+          if (!existing) {
+            const created = await prisma.user.create({
+              data: { email: user.email, name: user.name, image: user.image },
+            });
+            user.id = created.id;
+          } else {
+            user.id   = existing.id;
+            (user as any).role = existing.role;
+          }
+        } catch (err) {
+          console.error("[auth] signIn callback DB error:", err);
+          return false; // reject cleanly instead of throwing
         }
       }
       return true;
