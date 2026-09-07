@@ -2,7 +2,7 @@
 // src/app/auth/signin/page.tsx
 // Sign-in page — Google OAuth button + email/password form.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -36,6 +36,17 @@ function SignInForm() {
   }
 
   const [error, setError] = useState(resolveError(errorParam));
+
+  // Clear the ?error= param from the URL after reading it so that
+  // refreshing the page doesn't show a stale error from a previous attempt.
+  useEffect(() => {
+    if (errorParam) {
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("error");
+      router.replace(clean.pathname + (clean.search || ""), { scroll: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault();

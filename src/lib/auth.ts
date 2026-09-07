@@ -18,7 +18,8 @@ import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET,
+  // NextAuth v5 canonical env var is AUTH_SECRET; fall back to NEXTAUTH_SECRET
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   // ── Required for Vercel / reverse-proxy deployments in NextAuth v5 ─────
   // Without this, OAuth host-verification fails for Google while
   // Credentials (which skips redirect-URL verification) still works.
@@ -26,10 +27,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
 
   providers: [
-    // ── Google OAuth ───────────────────────────────────────────────────────
+    // ── Google OAuth ──────────────────────────────────────────────────
+    // NextAuth v5 auto-reads AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET;
+    // fall back to the GOOGLE_CLIENT_* names for backwards compat.
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId:     process.env.AUTH_GOOGLE_ID     ?? process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
     // ── Email / Password ───────────────────────────────────────────────────
