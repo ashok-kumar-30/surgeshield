@@ -57,16 +57,10 @@ function SignInForm() {
     });
     setLoading(false);
     if (res?.error) {
-      // Check if the account exists but was created via Google OAuth (no password)
-      setError("Invalid email or password. If you signed up with Google, use the \"Continue with Google\" button above.");
+      setError("Invalid email or password. Please check your credentials.");
       return;
     }
     router.push(callbackUrl);
-  }
-
-  async function handleGoogle() {
-    setLoading(true);
-    await signIn("google", { callbackUrl });
   }
 
   return (
@@ -95,24 +89,7 @@ function SignInForm() {
             </div>
           )}
 
-          {/* Google */}
-          <button
-            onClick={handleGoogle}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl font-medium text-sm transition-all hover:bg-white/10 disabled:opacity-50"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "white" }}
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
-
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-            <span className="text-[11px] text-slate-600 uppercase tracking-widest">or</span>
-            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-          </div>
-
-          {/* Credentials */}
+          {/* Credentials form — email/password only */}
           <form onSubmit={handleCredentials} className="space-y-4" noValidate>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
