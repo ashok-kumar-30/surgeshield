@@ -10,7 +10,13 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
+    "db:seed": "npx tsx prisma/seed.ts",
+    "load-test": "npx tsx scripts/load-test.ts",
+    "load-test:prod": "npx tsx scripts/load-test.ts https://surgeshield-xi.vercel.app",
     "push": "git add . && git commit -m \"$npm_config_m\" && git push origin main"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
