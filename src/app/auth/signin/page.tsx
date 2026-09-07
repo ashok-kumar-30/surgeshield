@@ -17,9 +17,25 @@ function SignInForm() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState(
-    errorParam === "CredentialsSignin" ? "Invalid email or password." : ""
-  );
+
+  // Map every possible NextAuth error code to a human-readable message.
+  function resolveError(code: string | null): string {
+    if (!code) return "";
+    const map: Record<string, string> = {
+      CredentialsSignin:    "Invalid email or password. If you signed up with Google, use the button below.",
+      OAuthSignin:          "Could not start Google sign-in. Please try again.",
+      OAuthCallback:        "Google sign-in failed — the redirect URI may not be configured in Google Cloud Console. Ask the admin to add: https://surgeshield-xi.vercel.app/api/auth/callback/google",
+      OAuthCreateAccount:   "Could not create an account with Google. Please try email sign-up.",
+      Callback:             "Sign-in callback error. Please try again or use email/password.",
+      AccessDenied:         "Access was denied. You may not have permission to sign in.",
+      Verification:         "The sign-in link has expired. Please request a new one.",
+      Configuration:        "Server configuration error. Please contact support.",
+      Default:              "An unexpected sign-in error occurred. Please try again.",
+    };
+    return map[code] ?? `Sign-in error: ${code}. Please try again.`;
+  }
+
+  const [error, setError] = useState(resolveError(errorParam));
 
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +45,11 @@ function SignInForm() {
       email, password, redirect: false,
     });
     setLoading(false);
-    if (res?.error) { setError("Invalid email or password."); return; }
+    if (res?.error) {
+      // Check if the account exists but was created via Google OAuth (no password)
+      setError("Invalid email or password. If you signed up with Google, use the \"Continue with Google\" button above.");
+      return;
+    }
     router.push(callbackUrl);
   }
 
@@ -98,18 +118,26 @@ function SignInForm() {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+              <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500">
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={loading}
-                className="input-dark"
-                autoComplete="current-password"
-              />
+              <Link
+                href="/auth/forgot-password"
+                className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={loading}
+              className="input-dark"
+              autoComplete="current-password"
+            />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full py-3">
               {loading

@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { redis } from "@/lib/redis";
 import { inngest } from "@/inngest/client";
+import { prisma } from "@/lib/prisma";
 import { trackRequestEvent } from "@/lib/metrics";
 
 // ---------------------------------------------------------------------------
@@ -105,7 +106,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { userId, eventId } = parsed.data;
 
-  // 2. Enforce per-user rate limiting.
+  // 2. Check for an existing registration -- return a friendly 409 immediately
+  //    instead of letting the user wait 15 s for a timeout.
+  try {
+    const existing = await prisma.registration.findUnique({
+      where: { userId_eventId: { userId, eventId } },
+      select: { status: true },
+    });
+
+    if (existing) {
+      const msg =
+        existing.status === "CONFIRMED"
+          ? "You have already secured a spot for this event! Check your email for your confirmation."
+          : existing.status === "WAITLISTED"
+          ? "You are already on the waitlist for this event. We will notify you if a spot opens up."
+          : "You have already submitted a registration for this event."
+
+      return NextResponse.json(
+        { error: msg, status: existing.status, alreadyRegistered: true },
+        { status: 409 }
+      );
+    }
+  } catch (dbErr) {
+    // If the DB check fails, continue — the unique constraint will still
+    // catch duplicates in the Inngest worker as a safety net.
+    console.warn("[registrations] Duplicate check DB error, continuing:", dbErr);
+  }
+
+  // 3. Enforce per-user rate limiting.
   // Fails OPEN: if Redis is unavailable we log and allow the request through
   // rather than blocking all registrations. Inngest provides a second layer
   // of duplicate-detection via the DB unique constraint.
