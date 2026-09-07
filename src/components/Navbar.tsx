@@ -23,10 +23,11 @@ export function Navbar() {
   if (pathname?.startsWith('/auth/')) return null;
 
   const links = [
-    { href:'/events',               label:'Events',       always: true },
-    { href:'/dashboard',            label:'My Tickets',   show: !!session },
-    { href:'/organizer/events/new', label:'Create Event', show: role==='ORGANIZER'||role==='ADMIN' },
-    { href:'/admin/dashboard',      label:'Admin',        show: role==='ADMIN' },
+    { href:'/events',               label:'🎫 Events',        always: true },
+    { href:'/dashboard',            label:'My Tickets',       show: !!session },
+    { href:'/organizer/dashboard',  label:'📊 My Events',     show: role==='ORGANIZER'||role==='ADMIN' },
+    { href:'/organizer/events/new', label:'+ Create Event',   show: role==='ORGANIZER'||role==='ADMIN' },
+    { href:'/admin/dashboard',      label:'⚡ Admin',         show: role==='ADMIN' },
   ].filter(l => l.always || l.show);
 
   return (
