@@ -18,6 +18,7 @@ type Phase =
   | 'WAITING'
   | 'CONFIRMED'
   | 'WAITLISTED'
+  | 'ALREADY_REGISTERED'
   | 'TIMEOUT'
   | 'ERROR';
 
@@ -267,6 +268,46 @@ function WaitlistedCard({ onReset }: { onReset: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
+// Already Registered
+// ---------------------------------------------------------------------------
+
+function AlreadyRegisteredCard({ registrationStatus, onReset }: { registrationStatus: string; onReset: () => void }) {
+  const isConfirmed = registrationStatus === 'CONFIRMED';
+  const isWaitlisted = registrationStatus === 'WAITLISTED';
+  return (
+    <Card accent='rgba(99,102,241,0.08)' border='rgba(99,102,241,0.3)'>
+      <div className='flex flex-col items-center gap-5 text-center'>
+        <div className='w-20 h-20 rounded-full flex items-center justify-center text-4xl' style={{ background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.35)' }}>
+          {isConfirmed ? '🎫' : isWaitlisted ? '⏳' : '✅'}
+        </div>
+        <div>
+          <p className='text-xs font-semibold tracking-widest uppercase mb-1' style={{ color:'#a5b4fc' }}>Already Registered</p>
+          <h2 className='text-2xl font-bold text-white'>
+            {isConfirmed ? 'You&rsquo;re Already In!' : isWaitlisted ? 'Already on Waitlist' : 'Already Registered'}
+          </h2>
+        </div>
+        <div className='w-full rounded-2xl p-4' style={{ background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.2)' }}>
+          <p className='text-sm text-slate-300 leading-relaxed'>
+            {isConfirmed
+              ? '🎉 Your spot is already confirmed! Check your email for the confirmation and calendar invite.'
+              : isWaitlisted
+              ? '⏳ You are already on the waitlist. We will email you the moment a spot opens up.'
+              : 'You have already submitted a registration for this event.'}
+          </p>
+        </div>
+        <button
+          onClick={onReset}
+          className='w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 hover:opacity-80 active:scale-95'
+          style={{ background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.3)', color:'#a5b4fc' }}
+        >
+          ← Back to Event
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Timeout
 // ---------------------------------------------------------------------------
 
@@ -382,6 +423,7 @@ export default function EventPage() {
   const [emailErr, setEmailErr] = useState('');
   const [apiAlert, setApiAlert] = useState('');   // 429 inline alert
   const [errorMsg, setErrorMsg] = useState('');   // ERROR phase message
+  const [existingStatus, setExistingStatus] = useState(''); // ALREADY_REGISTERED phase
   const [pollTick, setPollTick] = useState(0);   // drives progress bar
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const userIdRef  = useRef('');
@@ -451,6 +493,12 @@ export default function EventPage() {
         setApiAlert("You're clicking too fast! Please wait a moment and try again.");
         return;
       }
+      if (rRes.status === 409) {
+        const d = await rRes.json().catch(() => ({})) as { status?: string };
+        setExistingStatus(d.status ?? 'CONFIRMED');
+        setPhase('ALREADY_REGISTERED');
+        return;
+      }
       if (rRes.status === 202) {
         setPhase('WAITING');
         startPolling(userId);
@@ -492,7 +540,7 @@ export default function EventPage() {
   // ── Reset ─────────────────────────────────────────────────────────────────
   function reset() {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-    setPhase('IDLE'); setApiAlert(''); setErrorMsg(''); setPollTick(0);
+    setPhase('IDLE'); setApiAlert(''); setErrorMsg(''); setExistingStatus(''); setPollTick(0);
   }
 
   const isFormLocked = phase === 'SUBMITTING' || phase === 'WAITING';
@@ -574,11 +622,12 @@ export default function EventPage() {
           )}
 
           {/* WAITING ROOM */}
-          {phase === 'WAITING'   && <WaitingCard   dots={pollTick} />}
-          {phase === 'CONFIRMED' && <ConfirmedCard event={event} email={email} />}
-          {phase === 'WAITLISTED'&& <WaitlistedCard onReset={reset} />}
-          {phase === 'TIMEOUT'   && <TimeoutCard   email={email} />}
-          {phase === 'ERROR'     && <ErrorCard     message={errorMsg} onReset={reset} />}
+          {phase === 'WAITING'            && <WaitingCard   dots={pollTick} />}
+          {phase === 'CONFIRMED'          && <ConfirmedCard event={event} email={email} />}
+          {phase === 'WAITLISTED'         && <WaitlistedCard onReset={reset} />}
+          {phase === 'ALREADY_REGISTERED' && <AlreadyRegisteredCard registrationStatus={existingStatus} onReset={reset} />}
+          {phase === 'TIMEOUT'            && <TimeoutCard   email={email} />}
+          {phase === 'ERROR'              && <ErrorCard     message={errorMsg} onReset={reset} />}
 
         </div>
       </div>
