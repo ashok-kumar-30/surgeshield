@@ -9,6 +9,7 @@ frontend:
       commands:
         - npm run build
   artifacts:
+    # next.config.ts sets output:"standalone" — Amplify needs the full .next dir
     baseDirectory: .next
     files:
       - '**/*'
