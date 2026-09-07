@@ -69,7 +69,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.id = created.id;
         } else {
           user.id   = existing.id;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (user as any).role = existing.role;
         }
       }
@@ -80,7 +79,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.sub  = user.id;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         token.role = (user as any).role ?? "ATTENDEE";
       }
       return token;

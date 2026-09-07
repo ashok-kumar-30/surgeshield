@@ -46,6 +46,45 @@ const FOOTER_STYLE = `
   border-top: 1px solid rgba(255,255,255,0.07);
 `;
 
+// ─── ICS Helper ────────────────────────────────────────────────────────────────
+
+function formatIcsDate(dateStr: string): string {
+  // Convert standard ISO to YYYYMMDDThhmmssZ
+  const d = new Date(dateStr);
+  return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+function buildIcsString(params: {
+  eventTitle: string;
+  startsAt: string;
+  endsAt?: string;
+  location?: string;
+  meetingUrl?: string;
+  isVirtual?: boolean;
+}): string {
+  const { eventTitle, startsAt, endsAt, location, meetingUrl, isVirtual } = params;
+  
+  const loc = isVirtual ? (meetingUrl ?? "Virtual Event") : (location ?? "Venue TBA");
+  const start = formatIcsDate(startsAt);
+  // Default end time to 1 hour after start if not provided
+  const end = endsAt ? formatIcsDate(endsAt) : formatIcsDate(new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString());
+
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//SurgeShield//Registration//EN",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `DTSTART:${start}`,
+    `DTEND:${end}`,
+    `SUMMARY:${eventTitle}`,
+    `LOCATION:${loc}`,
+    "STATUS:CONFIRMED",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n");
+}
+
 // ─── CONFIRMED email ─────────────────────────────────────────────────────────
 
 export async function sendConfirmedEmail(params: {
@@ -53,13 +92,15 @@ export async function sendConfirmedEmail(params: {
   name:           string;
   eventTitle:     string;
   eventDate?:     string;
+  startsAt:       string;
+  endsAt?:        string;
   location?:      string;
   meetingUrl?:    string;
   isVirtual?:     boolean;
   registrationId: string;
 }): Promise<void> {
   const {
-    to, name, eventTitle, eventDate, location,
+    to, name, eventTitle, eventDate, startsAt, endsAt, location,
     meetingUrl, isVirtual, registrationId,
   } = params;
 
@@ -134,11 +175,21 @@ export async function sendConfirmedEmail(params: {
 </body>
 </html>`;
 
+  const icsString = buildIcsString({
+    eventTitle, startsAt, endsAt, location, meetingUrl, isVirtual
+  });
+
   await resend.emails.send({
     from:    FROM,
     to:      [to],
     subject: `✅ You're confirmed for ${eventTitle}`,
     html,
+    attachments: [
+      {
+        filename: 'invite.ics',
+        content: Buffer.from(icsString).toString('base64'),
+      }
+    ]
   });
 }
 
@@ -214,3 +265,91 @@ export async function sendWaitlistedEmail(params: {
     html,
   });
 }
+
+// ─── REMINDER email ─────────────────────────────────────────────────────────
+
+export async function sendReminderEmail(params: {
+  to:             string;
+  name:           string;
+  eventTitle:     string;
+  eventDate?:     string;
+  location?:      string;
+  meetingUrl?:    string;
+  isVirtual?:     boolean;
+  registrationId: string;
+}): Promise<void> {
+  const {
+    to, name, eventTitle, eventDate, location,
+    meetingUrl, isVirtual, registrationId,
+  } = params;
+
+  if (!process.env.RESEND_API_KEY) {
+    console.info(`[email] RESEND_API_KEY not set — skipping real reminder to ${to}`);
+    return;
+  }
+
+  const resend = getResend();
+
+  const locationLine = isVirtual
+    ? (meetingUrl ? `<a href="${meetingUrl}" style="color:#a5b4fc;">${meetingUrl}</a>` : "Virtual Event")
+    : (location ?? "Venue TBA");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="${BASE_STYLE}">
+  <div style="${CARD_STYLE}">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);padding:36px 32px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">⏰</div>
+      <h1 style="margin:0;font-size:24px;font-weight:800;color:white;letter-spacing:-0.5px;">
+        Event Reminder
+      </h1>
+      <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.8);">
+        Starting in 24 hours
+      </p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px;">
+      <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1;">
+        Hi <strong style="color:white;">${name}</strong>,
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:#94a3b8;line-height:1.6;">
+        Just a friendly reminder that <strong style="color:white;">${eventTitle}</strong> 
+        is coming up in 24 hours. See you soon!
+      </p>
+
+      <!-- Event details card -->
+      <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:16px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          ${eventDate ? `
+          <tr>
+            <td style="padding:6px 0;color:rgba(255,255,255,0.4);font-size:12px;text-transform:uppercase;letter-spacing:0.08em;width:90px;">📅 Date</td>
+            <td style="padding:6px 0;color:#e2e8f0;font-size:14px;">${eventDate}</td>
+          </tr>` : ""}
+          <tr>
+            <td style="padding:6px 0;color:rgba(255,255,255,0.4);font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">${isVirtual ? "🌐 Link" : "📍 Venue"}</td>
+            <td style="padding:6px 0;color:#e2e8f0;font-size:14px;">${locationLine}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div style="${FOOTER_STYLE}">
+      SurgeShield · Resilient Event Registration · This email was sent to ${to}
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await resend.emails.send({
+    from:    FROM,
+    to:      [to],
+    subject: `⏰ Reminder: ${eventTitle} is starting soon!`,
+    html,
+  });
+}
+

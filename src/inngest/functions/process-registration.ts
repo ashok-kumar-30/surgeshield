@@ -16,7 +16,7 @@ import { Prisma, RegistrationStatus } from "@prisma/client";
 import { inngest } from "@/inngest/client";
 import { prisma } from "@/lib/prisma";
 import { trackRequestEvent } from "@/lib/metrics";
-import { sendConfirmedEmail, sendWaitlistedEmail } from "@/lib/email";
+import { sendConfirmedEmail, sendWaitlistedEmail, sendReminderEmail } from "@/lib/email";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +27,8 @@ type SeatClaimResult =
       outcome: "CONFIRMED";
       eventTitle: string;
       eventDate: string | null;
+      startsAt: string;
+      endsAt: string | null;
       location:  string | null;
       meetingUrl: string | null;
       isVirtual:  boolean;
@@ -117,7 +119,7 @@ export const processRegistration = inngest.createFunction(
           const updatedEvent = await tx.event.findUniqueOrThrow({
             where: { id: eventId },
             select: {
-              title: true, startsAt: true, location: true,
+              title: true, startsAt: true, endsAt: true, location: true,
               meetingUrl: true, isVirtual: true,
             },
           });
@@ -128,6 +130,8 @@ export const processRegistration = inngest.createFunction(
             eventDate:  updatedEvent.startsAt.toLocaleDateString("en-US", {
               weekday: "long", month: "long", day: "numeric", year: "numeric",
             }),
+            startsAt:   updatedEvent.startsAt.toISOString(),
+            endsAt:     updatedEvent.endsAt?.toISOString() ?? null,
             location:   updatedEvent.location,
             meetingUrl: updatedEvent.meetingUrl,
             isVirtual:  updatedEvent.isVirtual,
@@ -220,6 +224,8 @@ export const processRegistration = inngest.createFunction(
         name:           userInfo.name ?? "there",
         eventTitle:     confirmed.eventTitle,
         eventDate:      confirmed.eventDate ?? undefined,
+        startsAt:       confirmed.startsAt,
+        endsAt:         confirmed.endsAt ?? undefined,
         location:       confirmed.location  ?? undefined,
         meetingUrl:     confirmed.meetingUrl ?? undefined,
         isVirtual:      confirmed.isVirtual,
@@ -244,6 +250,32 @@ export const processRegistration = inngest.createFunction(
       eventId,
       registrationId: registration.id,
     });
+
+    // -----------------------------------------------------------------------
+    // Step 4 -- Automated Reminder
+    // Wait until 24 hours before the event starts.
+    // -----------------------------------------------------------------------
+    const confirmed = claimResult as Extract<SeatClaimResult, { outcome: "CONFIRMED" }>;
+    const reminderDate = new Date(new Date(confirmed.startsAt).getTime() - 24 * 60 * 60 * 1000);
+    
+    // Only schedule if the reminder time is in the future
+    if (reminderDate > new Date()) {
+      await step.sleepUntil("wait-for-reminder", reminderDate);
+      
+      await step.run("send-reminder-email", async () => {
+        await sendReminderEmail({
+          to:             userInfo.email,
+          name:           userInfo.name ?? "there",
+          eventTitle:     confirmed.eventTitle,
+          eventDate:      confirmed.eventDate ?? undefined,
+          location:       confirmed.location  ?? undefined,
+          meetingUrl:     confirmed.meetingUrl ?? undefined,
+          isVirtual:      confirmed.isVirtual,
+          registrationId: registration.id,
+        });
+      });
+      logger.info("Reminder email dispatched.", { userId, eventId });
+    }
 
     return { status: "CONFIRMED", registrationId: registration.id };
   }
