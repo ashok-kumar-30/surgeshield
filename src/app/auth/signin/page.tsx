@@ -29,7 +29,11 @@ function SignInForm() {
       email, password, redirect: false,
     });
     setLoading(false);
-    if (res?.error) { setError("Invalid email or password."); return; }
+    if (res?.error) {
+      // Check if the account exists but was created via Google OAuth (no password)
+      setError("Invalid email or password. If you signed up with Google, use the \"Continue with Google\" button above.");
+      return;
+    }
     router.push(callbackUrl);
   }
 
@@ -98,18 +102,26 @@ function SignInForm() {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+              <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500">
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={loading}
-                className="input-dark"
-                autoComplete="current-password"
-              />
+              <Link
+                href="/auth/forgot-password"
+                className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={loading}
+              className="input-dark"
+              autoComplete="current-password"
+            />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full py-3">
               {loading

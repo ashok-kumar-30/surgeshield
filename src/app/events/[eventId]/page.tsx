@@ -272,26 +272,29 @@ function WaitlistedCard({ onReset }: { onReset: () => void }) {
 // ---------------------------------------------------------------------------
 
 function AlreadyRegisteredCard({ registrationStatus, onReset }: { registrationStatus: string; onReset: () => void }) {
-  const isConfirmed = registrationStatus === 'CONFIRMED';
+  const isConfirmed  = registrationStatus === 'CONFIRMED';
   const isWaitlisted = registrationStatus === 'WAITLISTED';
   return (
     <Card accent='rgba(99,102,241,0.08)' border='rgba(99,102,241,0.3)'>
       <div className='flex flex-col items-center gap-5 text-center'>
-        <div className='w-20 h-20 rounded-full flex items-center justify-center text-4xl' style={{ background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.35)' }}>
+        <div className='w-20 h-20 rounded-full flex items-center justify-center text-4xl'
+          style={{ background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.35)' }}>
           {isConfirmed ? '🎫' : isWaitlisted ? '⏳' : '✅'}
         </div>
         <div>
-          <p className='text-xs font-semibold tracking-widest uppercase mb-1' style={{ color:'#a5b4fc' }}>Already Registered</p>
+          <p className='text-xs font-semibold tracking-widest uppercase mb-1' style={{ color:'#a5b4fc' }}>
+            Already Registered
+          </p>
           <h2 className='text-2xl font-bold text-white'>
-            {isConfirmed ? 'You&rsquo;re Already In!' : isWaitlisted ? 'Already on Waitlist' : 'Already Registered'}
+            {isConfirmed ? "You're Already In!" : isWaitlisted ? 'Already on Waitlist' : 'Already Registered'}
           </h2>
         </div>
         <div className='w-full rounded-2xl p-4' style={{ background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.2)' }}>
           <p className='text-sm text-slate-300 leading-relaxed'>
             {isConfirmed
-              ? '🎉 Your spot is already confirmed! Check your email for the confirmation and calendar invite.'
+              ? "🎉 Your spot is already confirmed! Check your email for the confirmation and calendar invite."
               : isWaitlisted
-              ? '⏳ You are already on the waitlist. We will email you the moment a spot opens up.'
+              ? "⏳ You are already on the waitlist. We will email you the moment a spot opens up."
               : 'You have already submitted a registration for this event.'}
           </p>
         </div>
