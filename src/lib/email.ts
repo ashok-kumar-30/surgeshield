@@ -17,7 +17,7 @@ function getResend(): Resend {
   if (!key) throw new Error("RESEND_API_KEY is not set");
   return new Resend(key);
 }
-const FROM   = process.env.FROM_EMAIL ?? "SurgeShield <noreply@surgeshield.dev>";
+const FROM   = process.env.FROM_EMAIL ?? "SurgeShield <onboarding@resend.dev>";
 
 // ─── Shared styles ───────────────────────────────────────────────────────────
 
