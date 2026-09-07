@@ -17,9 +17,25 @@ function SignInForm() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState(
-    errorParam === "CredentialsSignin" ? "Invalid email or password." : ""
-  );
+
+  // Map every possible NextAuth error code to a human-readable message.
+  function resolveError(code: string | null): string {
+    if (!code) return "";
+    const map: Record<string, string> = {
+      CredentialsSignin:    "Invalid email or password. If you signed up with Google, use the button below.",
+      OAuthSignin:          "Could not start Google sign-in. Please try again.",
+      OAuthCallback:        "Google sign-in failed — the redirect URI may not be configured in Google Cloud Console. Ask the admin to add: https://surgeshield-xi.vercel.app/api/auth/callback/google",
+      OAuthCreateAccount:   "Could not create an account with Google. Please try email sign-up.",
+      Callback:             "Sign-in callback error. Please try again or use email/password.",
+      AccessDenied:         "Access was denied. You may not have permission to sign in.",
+      Verification:         "The sign-in link has expired. Please request a new one.",
+      Configuration:        "Server configuration error. Please contact support.",
+      Default:              "An unexpected sign-in error occurred. Please try again.",
+    };
+    return map[code] ?? `Sign-in error: ${code}. Please try again.`;
+  }
+
+  const [error, setError] = useState(resolveError(errorParam));
 
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault();
