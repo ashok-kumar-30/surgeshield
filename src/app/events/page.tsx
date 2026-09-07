@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 // Refresh this page every 30 seconds so new events appear without a full rebuild.
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 const GRADIENTS = [
   "from-indigo-900/60 to-purple-900/60",
@@ -36,22 +36,27 @@ function fmtTime(d: Date) {
 }
 
 export default async function EventsPage() {
-  const events = await prisma.event.findMany({
-    where: { isPublished: true },
-    orderBy: { startsAt: "asc" },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      location: true,
-      isVirtual: true,
-      startsAt: true,
-      endsAt: true,
-      totalSeats: true,
-      availableSeats: true,
-      organizer: { select: { name: true } },
-    },
-  });
+  let events: any[] = [];
+  try {
+    events = await prisma.event.findMany({
+      where: { isPublished: true },
+      orderBy: { startsAt: "asc" },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        location: true,
+        isVirtual: true,
+        startsAt: true,
+        endsAt: true,
+        totalSeats: true,
+        availableSeats: true,
+        organizer: { select: { name: true } },
+      },
+    });
+  } catch (err) {
+    console.error("Failed to fetch events from database:", err);
+  }
 
   return (
     <div

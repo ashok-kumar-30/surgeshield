@@ -3,8 +3,7 @@
 // User-facing event registration page with async queue-based flow.
 
 import { useState, useRef, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useParams } from 'next/navigation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -371,9 +370,6 @@ export default function EventPage() {
   const params   = useParams();
   const eventId  = typeof params.eventId === 'string' ? params.eventId : Array.isArray(params.eventId) ? params.eventId[0] : '';
 
-  const { data: session } = useSession();
-  const router = useRouter();
-
   const [phase,    setPhase]    = useState<Phase>('LOADING');
   const [event,    setEvent]    = useState<EventData | null>(null);
   const [name,     setName]     = useState('');
@@ -385,14 +381,6 @@ export default function EventPage() {
   const [pollTick, setPollTick] = useState(0);   // drives progress bar
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const userIdRef  = useRef('');
-
-  // Pre-fill form from session when available
-  useEffect(() => {
-    if (session?.user) {
-      if (session.user.name)  setName(session.user.name);
-      if (session.user.email) setEmail(session.user.email);
-    }
-  }, [session]);
 
   // Fetch event details on mount
   useEffect(() => {
@@ -423,20 +411,14 @@ export default function EventPage() {
     setApiAlert('');
     setPhase('SUBMITTING');
     try {
-      // Step 1: Resolve userId — prefer the authenticated session, fall back to find-or-create
-      let userId: string;
-      if (session?.user?.id) {
-        userId = session.user.id;
-      } else {
-        const uRes = await fetch('/api/users/find-or-create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), email: email.trim() }),
-        });
-        if (!uRes.ok) throw new Error('Unable to set up your account. Please try again.');
-        const data = await uRes.json() as { userId: string };
-        userId = data.userId;
-      }
+      // Step 1: Resolve a stable userId from the email
+      const uRes = await fetch('/api/users/find-or-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+      });
+      if (!uRes.ok) throw new Error('Unable to set up your account. Please try again.');
+      const { userId } = await uRes.json() as { userId: string };
       userIdRef.current = userId;
 
       // Step 2: Enqueue the registration
