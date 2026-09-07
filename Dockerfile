@@ -10,6 +10,9 @@ COPY . .
 
 RUN npx prisma generate
 
+# Tell next.config.ts to enable standalone output (required for Docker)
+ENV STANDALONE_BUILD=true
+
 RUN npm run build
 
 
